@@ -169,4 +169,48 @@ CANCER_TARGETS = {
         "common_cancers": ["breast", "pancreatic"],
         "mutation_types": ["frameshift", "nonsense"],
     },
+
+    # --- DNA mismatch repair / Lynch syndrome ---
+    "MLH1": {
+        "chrom": "chr3",
+        "start": 36993332,
+        "end": 37050918,
+        "role": "MutL homolog 1 — DNA mismatch repair",
+        "strategy": "CRISPRa to reactivate epigenetically silenced MLH1 "
+                     "(promoter hypermethylation is the most common cause); "
+                     "HDR correction of germline truncating mutations",
+        "common_cancers": ["colorectal", "endometrial", "ovarian", "gastric"],
+        "mutation_types": ["nonsense", "frameshift", "splice_site",
+                           "promoter_methylation"],
+    },
+    "MSH2": {
+        "chrom": "chr2",
+        "start": 47403067,
+        "end": 47709830,
+        "role": "MutS homolog 2 — DNA mismatch repair",
+        "strategy": "HDR correction of truncating mutations; gene replacement "
+                     "feasible (cDNA ~2.8 kb)",
+        "common_cancers": ["colorectal", "endometrial", "ovarian",
+                           "urinary_tract"],
+        "mutation_types": ["nonsense", "frameshift", "large_deletion"],
+    },
+    "MSH6": {
+        "chrom": "chr2",
+        "start": 47695530,
+        "end": 47721031,
+        "role": "MutS homolog 6 — DNA mismatch repair (MSH2-MSH6 heterodimer)",
+        "strategy": "HDR correction of truncating mutations",
+        "common_cancers": ["colorectal", "endometrial"],
+        "mutation_types": ["missense", "nonsense", "frameshift"],
+    },
+    "PMS2": {
+        "chrom": "chr7",
+        "start": 5970925,
+        "end": 6009106,
+        "role": "PMS1 homolog 2 — DNA mismatch repair (MLH1-PMS2 heterodimer)",
+        "strategy": "HDR correction; note pseudogene PMS2CL complicates "
+                     "sequencing — long-read or gene-specific PCR required",
+        "common_cancers": ["colorectal", "endometrial"],
+        "mutation_types": ["nonsense", "frameshift", "splice_site"],
+    },
 }
