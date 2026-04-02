@@ -1,0 +1,42 @@
+# Genome data (large binary files)
+Genome/
+*.bam
+*.bam.bai
+*.bai
+*.vcf.gz
+*.vcf.gz.tbi
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+*.env
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large media/website assets
+OpenCure_Website/*.mp4
+OpenCure_Website/*.zip
+
+# Archives
+*.zip
+
+# Claude local state
+.claude/ralph-loop.local.md
