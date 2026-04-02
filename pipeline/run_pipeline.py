@@ -96,6 +96,9 @@ from .databases.expanded_disease_targets import (
     IMMUNE_CHECKPOINT_TARGETS,
     CRANIOFACIAL_TARGETS,
 )
+from .databases.inborn_errors_and_rare_targets import (
+    ALL_INBORN_ERRORS_TARGETS,
+)
 
 from .steps import (
     step1_validate,
@@ -199,6 +202,7 @@ def select_targets(diagnosis: str, conditions: list[str] | None = None) -> dict:
     if diagnosis == DIAGNOSIS_RARE_DISEASE:
         targets = dict(ALL_RARE_DISEASE_TARGETS)
         targets.update(ALL_ADDITIONAL_RARE_TARGETS)
+        targets.update(ALL_INBORN_ERRORS_TARGETS)
         if conditions:
             filtered = {}
             for gene, info in targets.items():

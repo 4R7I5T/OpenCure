@@ -1,248 +1,267 @@
-To perform the analysis using GPT-4o for CRISPR-Cas9 gene edits, you will need to integrate GPT-4o with your local setup. Below is an updated guide, including the installation of necessary libraries, setting up the environment, and using GPT-4o for analysis.
-
-Step-by-Step Guide for Genomic Analysis and CRISPR Suggestions with GPT-4o
-
-1. Set Up the Environment
-
-# Install required dependencies:
-
-# Update and install dependencies (Mac)
-
-brew update
-brew install bwa samtools bcftools cmake git wget openjdk htslib freebayes
-
-# Update and install dependencies (Linux)
-
-pip install -r requirements.txt
-
-1a. Install FreeBayes
-
-git clone --recursive https://github.com/freebayes/freebayes.git
-cd freebayes
-make
-sudo mv bin/freebayes /usr/local/bin/
-
-
-2. Download the Reference Genome and Sample Data
-
-# Prepare your working directory and download the necessary files:
-
-mkdir -p ~/genome_analysis
-cd ~/genome_analysis
-
-# Download GRCh38 reference genome (FASTA format)
-
-wget -O GRCh38.fna.gz ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/GCA_000001405.15_GRCh38_genomic.fna.gz
-
-gunzip GRCh38.fna.gz
-
-# Download sample data
-
-wget -O WGS_Norm.tar http://genomedata.org/pmbio-workshop/fastqs/WGS_Norm.tar
-wget -O WGS_Tumor.tar http://genomedata.org/pmbio-workshop/fastqs/WGS_Tumor.tar
-
-# Unpack the individual fastq files
-
-mkdir -p fastq
-cd fastq
-tar -xvf ../WGS_Norm.tar
-tar -xvf ../WGS_Tumor.tar
-cd ..
-
-
-3. Index the Reference Genome
-
-bwa index GRCh38.fna
-
-
-4. Align the Reads to the Reference Genome
-
-# Align the reads for each lane:
-
-# Align normal sample reads to reference genome (Lane 1)
-bwa mem GRCh38.fna fastq/WGS_Norm_Lane1_R1.fastq.gz fastq/WGS_Norm_Lane1_R2.fastq.gz > normal_Lane1.sam
-samtools view -S -b normal_Lane1.sam > normal_Lane1.bam
-samtools sort normal_Lane1.bam -o normal_Lane1_sorted.bam
-samtools index normal_Lane1_sorted.bam
-
-# Repeat for Lane 2 and Lane 3
-bwa mem GRCh38.fna fastq/WGS_Norm_Lane2_R1.fastq.gz fastq/WGS_Norm_Lane2_R2.fastq.gz > normal_Lane2.sam
-samtools view -S -b normal_Lane2.sam > normal_Lane2.bam
-samtools sort normal_Lane2.bam -o normal_Lane2_sorted.bam
-samtools index normal_Lane2_sorted.bam
-
-bwa mem GRCh38.fna fastq/WGS_Norm_Lane3_R1.fastq.gz fastq/WGS_Norm_Lane3_R2.fastq.gz > normal_Lane3.sam
-samtools view -S -b normal_Lane3.sam > normal_Lane3.bam
-samtools sort normal_Lane3.bam -o normal_Lane3_sorted.bam
-samtools index normal_Lane3_sorted.bam
-
-# Align tumor sample reads to reference genome (Lane 1)
-bwa mem GRCh38.fna fastq/WGS_Tumor_Lane1_R1.fastq.gz fastq/WGS_Tumor_Lane1_R2.fastq.gz > tumor_Lane1.sam
-samtools view -S -b tumor_Lane1.sam > tumor_Lane1.bam
-samtools sort tumor_Lane1.bam -o tumor_Lane1_sorted.bam
-samtools index tumor_Lane1_sorted.bam
-
-# Repeat for Lane 2 and Lane 3
-bwa mem GRCh38.fna fastq/WGS_Tumor_Lane2_R1.fastq.gz fastq/WGS_Tumor_Lane2_R2.fastq.gz > tumor_Lane2.sam
-samtools view -S -b tumor_Lane2.sam > tumor_Lane2.bam
-samtools sort tumor_Lane2.bam -o tumor_Lane2_sorted.bam
-samtools index tumor_Lane2_sorted.bam
-
-bwa mem GRCh38.fna fastq/WGS_Tumor_Lane3_R1.fastq.gz fastq/WGS_Tumor_Lane3_R2.fastq.gz > tumor_Lane3.sam
-samtools view -S -b tumor_Lane3.sam > tumor_Lane3.bam
-samtools sort tumor_Lane3.bam -o tumor_Lane3_sorted.bam
-samtools index tumor_Lane3_sorted.bam
-
-
-5. Merge BAM Files for Each Sample
-
-# Merge BAM files for normal sample
-samtools merge normal_merged.bam normal_Lane1_sorted.bam normal_Lane2_sorted.bam normal_Lane3_sorted.bam
-samtools sort normal_merged.bam -o normal_sorted.bam
-samtools index normal_sorted.bam
-
-# Merge BAM files for tumor sample
-samtools merge tumor_merged.bam tumor_Lane1_sorted.bam tumor_Lane2_sorted.bam tumor_Lane3_sorted.bam
-samtools sort tumor_merged.bam -o tumor_sorted.bam
-samtools index tumor_sorted.bam
-
-
-6. Perform Variant Calling
-
-# Perform variant calling on the normal sample
-freebayes -f GRCh38.fna normal_sorted.bam > normal_variants.vcf
-
-# Perform variant calling on the tumor sample
-freebayes -f GRCh38.fna tumor_sorted.bam > tumor_variants.vcf
-
-
-7. Compress and Index VCF Files
-
-
-bgzip tumor_variants.vcf
-bgzip normal_variants.vcf
-
-tabix tumor_variants.vcf.gz
-tabix normal_variants.vcf.gz
-
-
-8. Compare Variants
-
-bcftools isec -p variant_comparison -O v tumor_variants.vcf.gz normal_variants.vcf.gz
-
-
-9. Annotate Variants Using SnpEff
-
-# Download and Unzip SnpEff
-
-wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip
-unzip snpEff_latest_core.zip
-cd snpEff
-
-# Manually Download the GRCh38.92 Database
-
-
-wget https://snpeff.blob.core.windows.net/databases/v5_0/snpEff_v5_0_GRCh38.92.zip
-
-
-# Extract the Database
-
-unzip snpEff_v5_0_GRCh38.92.zip -d data/
-
-# Edit the Configuration File
-
-bash
-nano snpEff.config
-
-
-Add:
-
-GRCh38.92.genome : Human genome version GRCh38 (Ensembl 92)
-
-
-# Annotate the VCF File
-
-
-java -jar snpEff.jar GRCh38.92 ../genome_analysis/variant_comparison/0002.vcf > ../genome_analysis/annotated_variants.vcf
-
-
-# Python Script for GPT-4o Analysis (`gpt4o_crispr.py`)
-
-# Create the Python script in your working directory:
-
-import openai
-
-# Set up the OpenAI API key
-openai.api_key = "your_openai_api_key"
-
-# Read the annotated variants file
-with open('../genome_analysis/annotated_variants.vcf', 'r') as file:
-    annotated_variants = file.read()
-
-# Define a function to get CRISPR-Cas9 suggestions from GPT-4o
-def get_crispr_suggestions(text):
-    prompt = f"Based on the following annotated variants from a tumor-normal comparison, suggest specific CRISPR-Cas9 gene edits that can revert the tumor genome to the normal state:\n\n{text}"
-    response = openai.Completion.create(
-      engine="gpt-4o",
-      prompt=prompt,
-      max_tokens=1000
-    )
-    return response.choices[0].text.strip()
-
-# Get CRISPR-Cas9 gene edit suggestions from GPT-4o
-crispr_suggestions = get_crispr_suggestions(annotated_variants)
-
-# Print the CRISPR-Cas9 gene edit suggestions
-print(crispr_suggestions)
-
-
-# Run the Python Script
-
-python gpt4o_crispr.py
-
-By following these steps, you should be able to manually download the GRCh38.92 database for SnpEff, annotate your VCF file, and proceed with CRISPR-Cas9 gene edit suggestions using GPT-4o.
-
-
-NOW THAT PRELIMINARY PROCESSING IS DONE - THE TRAINING SET PREP HAPPENS BY RUNNING THE PYTHON SCRIPTS ONE BY ONE:
-
-E.G. (python Step1.py... python step2.py...)
-
-Step 1: Process VCF File for CRISPR-Cas9 Gene Edits
-
-This step takes a variant call format (VCF) file that contains genomic data (from a tumor-normal comparison) and prepares a prompt to be used later by OpenAI’s GPT model. It extracts important metadata from the VCF file (such as the contig, file format, reference genome, etc.) and constructs a detailed prompt asking GPT to suggest specific CRISPR-Cas9 gene edits that could revert the tumor genome to a normal state.
-
-Step 2: Token Counting
-
-This step counts the number of tokens in a given file using GPT-2 tokenization. It reads a file in chunks, tokenizes the text, and counts how many tokens are present. This is useful for determining the size of data to be sent to the OpenAI API, as there is often a token limit in requests.
-
-Step 3: OpenAI API Interaction
-
-This step sends the prompt created in Step 1 to the OpenAI API, along with the genomic data, to get specific CRISPR-Cas9 gene editing suggestions. It handles the communication with OpenAI’s API by providing the prompt and receiving the AI’s response, which is saved to a CSV file for further use.
-
-Step 4: Additional Data Processing
-    
-Step4a.py: This Python script processes the genomic data further, preparing it for downstream tasks. It may involve tasks like parsing and validating the input data (e.g., the VCF files or sequences) and performing intermediate calculations or formatting.
-
-Step4b.sh: This shell script likely handles file operations or calls external tools to manipulate the data. It could involve system-level tasks such as invoking tools like samtools or other command-line utilities.
-
-Step 5: Extract Sequence Data
-
-This shell script likely performs extraction of sequence data from genomic files (such as FASTA or FASTQ files). It could involve using tools like samtools or bcftools to manipulate BAM files (binary alignment) and prepare the data for further use in the pipeline.
-Purpose: To extract genomic sequences and align them to the reference genome, preparing the data for CRISPR analysis.
-
-Step 6: Data Formatting
-
-
-This step formats the extracted sequence data from Step 5 into a format that is usable for machine learning or CRISPR analysis. This might involve cleaning up the sequences, converting them into a standard format, or ensuring that they are compatible with the next steps in the pipeline.
-
-
-Step 7: Prepare JSONL Data for Model Training
-
-This step processes the cleaned sequence data and prepares it in .jsonl (JSON Lines) format, which is commonly used for training machine learning models. It reads the CRISPR-related data (e.g., sequences and associated guide RNA), formats it correctly, and outputs a file ready to be used for model training.
-
-Step 8: Sequence Cleaning and Validation
-
-This final step cleans and validates the sequences from the JSONL file to ensure that they meet the necessary standards. It removes any invalid characters (e.g., ‘N’ in DNA sequences) and ensures that only valid nucleotide bases (A, C, G, T) remain.
-Purpose: To finalize and validate the sequences to ensure accuracy before they are used in machine learning models or CRISPR research.
-
-These eight steps form a comprehensive pipeline for processing genomic data, generating CRISPR-Cas9 gene-editing suggestions using AI, and formatting the data for machine learning models to assist in cancer research.
+# OpenCure
+
+**Personalized CRISPR Therapy Design Pipeline** -- From patient genome to therapeutic construct in one command.
+
+OpenCure analyzes patient whole-genome sequencing data (VCF + BAM) against curated disease gene databases, designs patient-specific CRISPR guide RNAs, performs off-target safety analysis, and generates complete AAV delivery construct maps.
+
+**29 diagnosis pipelines | 325 unique gene targets | 105+ rare diseases**
+
+---
+
+## Quick Start
+
+```bash
+# Install dependencies
+conda create -n opencure python=3.10
+conda activate opencure
+pip install -r pipeline/requirements.txt
+conda install -c bioconda samtools bcftools ensembl-vep cas-offinder
+
+# Run the pipeline
+python -m pipeline.run_pipeline \
+    --vcf patient.vcf.gz \
+    --bam patient.bam \
+    --patient PATIENT_001 \
+    --diagnosis cancer
+```
+
+## Supported Diagnosis Modes
+
+### Core Pipelines
+
+| Mode | Flag | Genes | Description |
+|------|------|-------|-------------|
+| **Cancer** | `--diagnosis cancer` | 17 | TP53, BRCA1/2, KRAS, EGFR, BRAF, PTEN, MYC, and more |
+| **Mental Health** | `--diagnosis mental_health` | 13 | SLC6A4, BDNF, COMT, OPRM1, FKBP5 -- pharmacogenomics and gene therapy |
+| **Neuropsychiatric** | `--diagnosis neuropsychiatric` | 9 | Circuit-level neuromodulation with DREADD chemogenetic constructs |
+| **Autoimmune / Yao Syndrome** | `--diagnosis autoimmune` | 19 | NOD2, MEFV, NLRP3 -- includes Yao syndrome diagnostic scoring engine |
+| **Hematological** | `--diagnosis hematological` | 11 | Sickle cell (Casgevy-target BCL11A), thalassemia, hemophilia A/B |
+| **Immunodeficiency** | `--diagnosis immunodeficiency` | 19 | SCID, CGD, cystic fibrosis, PKU, familial hypercholesterolemia |
+| **Hereditary** | `--diagnosis hereditary` | 18 | Huntington, SMA, DMD, retinal dystrophies, epidermolysis bullosa, TTR amyloidosis |
+| **Cardiac** | `--diagnosis cardiac` | 16 | HCM, DCM, ACM, Long QT, Brugada, CPVT, Marfan, vEDS |
+
+### Specialized Pipelines
+
+| Mode | Flag | Genes | Description |
+|------|------|-------|-------------|
+| **Rare Disease** | `--diagnosis rare_disease` | 105 | Lysosomal storage, kidney, hearing loss, metabolic, neurological, and 50+ inborn errors |
+| **Infectious** | `--diagnosis infectious` | 4 | HIV (CCR5 knockout), Hepatitis B, HPV |
+| **Immune Dysregulation** | `--diagnosis immune_dysregulation` | 11 | IPEX, familial HLH, ALPS, CTLA-4, STAT3/1 GOF |
+| **Telomere / Aging** | `--diagnosis telomere_aging` | 5 | Dyskeratosis congenita, Werner syndrome, progeria |
+| **Pulmonary** | `--diagnosis pulmonary` | 3 | Pulmonary arterial hypertension, surfactant deficiency |
+| **Hepatic** | `--diagnosis hepatic` | 4 | Crigler-Najjar, PFIC types 1-3 |
+| **Skeletal** | `--diagnosis skeletal` | 2 | Achondroplasia, hypophosphatasia |
+| **Dermatologic** | `--diagnosis dermatologic` | 2 | Ichthyosis |
+| **Mitochondrial** | `--diagnosis mitochondrial` | 9 | POLG, Leigh syndrome, mtDNA depletion syndromes |
+| **Complement** | `--diagnosis complement` | 6 | aHUS, complement deficiencies, C3 glomerulopathy |
+| **Coagulation** | `--diagnosis coagulation` | 6 | von Willebrand, thrombophilia, Factor V Leiden |
+| **Pain** | `--diagnosis pain` | 3 | Erythromelalgia, congenital insensitivity to pain |
+| **Epilepsy** | `--diagnosis epilepsy` | 6 | SCN2A, KCNQ2, CDKL5, STXBP1, SCN8A, KCNT1 |
+| **Congenital Heart** | `--diagnosis congenital_heart` | 4 | ASD/VSD, Holt-Oram, structural heart defects |
+| **Monogenic Diabetes** | `--diagnosis monogenic_diabetes` | 6 | MODY (GCK, HNF1A, HNF4A), neonatal diabetes |
+| **Obesity** | `--diagnosis obesity` | 5 | MC4R, leptin/leptin receptor, POMC deficiency |
+| **Ophthalmology** | `--diagnosis ophthalmology` | 7 | Stargardt, achromatopsia, aniridia, retinoschisis |
+| **NCL / Batten** | `--diagnosis ncl` | 7 | Neuronal ceroid lipofuscinoses CLN1-8 |
+| **Bone Marrow Failure** | `--diagnosis bone_marrow_failure` | 4 | RUNX1, GATA2, Shwachman-Diamond |
+| **Immune Checkpoint** | `--diagnosis immune_checkpoint` | 5 | PD-1, PD-L1, LAG-3, TIM-3, TIGIT |
+| **Craniofacial** | `--diagnosis craniofacial` | 4 | Treacher Collins, Crouzon/Apert, Saethre-Chotzen |
+
+## Usage Examples
+
+### Basic Usage
+
+```bash
+# Cancer genomics -- all 17 oncogene/tumor suppressor targets
+python -m pipeline.run_pipeline \
+    --vcf patient.vcf.gz \
+    --bam patient.bam \
+    --patient PATIENT_001 \
+    --diagnosis cancer
+
+# Sickle cell disease -- BCL11A, HBB, HBG1/2, and HbF regulators
+python -m pipeline.run_pipeline \
+    --vcf patient.vcf.gz \
+    --bam patient.bam \
+    --patient PATIENT_002 \
+    --diagnosis hematological \
+    --conditions sickle_cell_disease
+
+# Yao syndrome -- NOD2 with diagnostic scoring and treatment guidance
+python -m pipeline.run_pipeline \
+    --vcf patient.vcf.gz \
+    --bam patient.bam \
+    --patient PATIENT_003 \
+    --diagnosis autoimmune \
+    --conditions yao_syndrome
+```
+
+### Condition-Based Filtering
+
+Use `--conditions` to focus on specific diseases within a pipeline:
+
+```bash
+# Cardiac: only Long QT syndrome genes
+python -m pipeline.run_pipeline \
+    --vcf p.vcf.gz --bam p.bam --patient P001 \
+    --diagnosis cardiac --conditions LQTS
+
+# Rare disease: only lysosomal storage diseases
+python -m pipeline.run_pipeline \
+    --vcf p.vcf.gz --bam p.bam --patient P001 \
+    --diagnosis rare_disease --conditions lysosomal_storage
+
+# Rare disease: only hearing loss genes
+python -m pipeline.run_pipeline \
+    --vcf p.vcf.gz --bam p.bam --patient P001 \
+    --diagnosis rare_disease --conditions hearing_loss
+
+# Immunodeficiency: only SCID genes
+python -m pipeline.run_pipeline \
+    --vcf p.vcf.gz --bam p.bam --patient P001 \
+    --diagnosis immunodeficiency --conditions SCID
+
+# Mitochondrial: only mtDNA depletion syndromes
+python -m pipeline.run_pipeline \
+    --vcf p.vcf.gz --bam p.bam --patient P001 \
+    --diagnosis mitochondrial --conditions mtDNA_depletion
+```
+
+### Verbose Logging
+
+```bash
+python -m pipeline.run_pipeline \
+    --vcf patient.vcf.gz --bam patient.bam \
+    --patient PATIENT_001 --diagnosis autoimmune \
+    --conditions yao_syndrome -v
+```
+
+## Pipeline Steps
+
+The pipeline executes up to 8 steps automatically:
+
+```
+Step 1:   Validate inputs (VCF integrity, BAM index, coverage at target loci)
+Step 2:   Extract patient variants at target gene loci + promoter regions
+Step 2b:  VEP variant impact assessment (SIFT, PolyPhen, consequence)
+Step 2c:  Autoinflammatory annotation (autoimmune mode only)
+            -- Known variant matching, compound het detection,
+               digenic screening, Yao syndrome scoring
+Step 3:   Design patient-specific guide RNAs (PAM sites, scoring)
+Step 4:   Off-target analysis (Cas-OFFinder or heuristic fallback)
+Step 5:   Construct design (AAV9 vectors, DREADD for neuropsych)
+Step 6:   Generate JSON summary + human-readable report
+```
+
+## Output Structure
+
+```
+PATIENT_001_20260402_143022_opencure/
+|-- pipeline_summary.json
+|-- pipeline_report.txt
+|-- PATIENT_001_gene_profile.json
+|-- PATIENT_001_targeting_strategy.json
+|-- PATIENT_001_guide_designs.json
+|-- PATIENT_001_vep_annotated.vcf
+|-- PATIENT_001_vep_high_impact.json
+|-- PATIENT_001_autoinflammatory_assessment.json   # autoimmune mode
+|-- offtarget_analysis/
+|   |-- offtarget_results.json
+|   +-- filtered_safe_guides.json
++-- construct_maps/
+    |-- construct_CRISPRi_GENE.json
+    |-- construct_CRISPRa_GENE.json
+    +-- construct_DREADD_inhibitory.json            # neuropsych mode
+```
+
+## Specialized Features
+
+### Yao Syndrome Diagnostic Engine
+
+When running `--diagnosis autoimmune --conditions yao_syndrome`:
+
+- Matches patient NOD2 variants against 8 cataloged Yao-associated variants
+- Detects compound heterozygosity (49% of patients carry 2+ NOD2 variants)
+- Screens digenic combinations (NOD2 + MEFV/NLRP3/NLRP12/TNFRSF1A)
+- Scores diagnostic likelihood (0-100)
+- Generates differential diagnosis (Blau, Crohn's, FMF, CAPS)
+- Provides genotype-guided treatment recommendations
+
+### DREADD Chemogenetic Constructs
+
+The neuropsychiatric pipeline designs DREADD constructs for on-demand neural circuit control:
+
+- hM4Di inhibitory DREADD at AAVS1 safe harbor
+- hM3Dq excitatory DREADD at ROSA26 safe harbor
+- Activated by deschloroclozapine (DCZ)
+
+### VEP Variant Impact Assessment
+
+All non-cancer modes run Ensembl VEP for functional annotation. Falls back to heuristic scoring if VEP is not installed.
+
+## Installation
+
+### Prerequisites
+
+- Python 3.10+
+- conda (recommended)
+
+### Full Installation
+
+```bash
+conda create -n opencure python=3.10
+conda activate opencure
+
+pip install -r pipeline/requirements.txt
+
+# Bioinformatics tools (optional but recommended)
+conda install -c bioconda samtools bcftools
+conda install -c bioconda ensembl-vep
+conda install -c bioconda cas-offinder
+
+# Reference genome
+wget https://ftp.ensembl.org/pub/release-110/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+gunzip Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+samtools faidx Homo_sapiens.GRCh38.dna.primary_assembly.fa
+```
+
+### Environment Variables (optional)
+
+```bash
+export SAMTOOLS=samtools
+export BCFTOOLS=bcftools
+export VEP_EXECUTABLE=vep
+export VEP_CACHE_DIR=/path/to/vep/cache
+export CAS_OFFINDER=cas-offinder
+export NCBI_EMAIL=your@email.com
+export NCBI_API_KEY=your_ncbi_key
+```
+
+## Project Structure
+
+```
+OpenCure/
+|-- pipeline/
+|   |-- __init__.py              # Version 2.1.0
+|   |-- __main__.py
+|   |-- config.py                # 29 diagnosis constants
+|   |-- run_pipeline.py          # Orchestration
+|   |-- databases/               # 15 gene target databases (325 genes)
+|   |-- steps/                   # 8 pipeline stages
+|   +-- utils/                   # VCF, guide RNA, sequence utilities
++-- OpenCure-main/               # Legacy v1 (reference only)
+```
+
+## References
+
+- [Casgevy](https://www.casgevyhcp.com/) -- FDA-approved CRISPR for SCD/thalassemia
+- [Nomani et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11449693/) -- Yao syndrome genotype/phenotype
+- NCBI Gene, ClinVar, dbSNP, gnomAD, COSMIC, OncoKB
+- Ensembl VEP (Variant Effect Predictor)
+
+## License
+
+See [LICENSE](LICENSE) for details.
+
+## Disclaimer
+
+This software is for **research purposes only**. Not a medical device. All interventions require informed consent and IRB/ethics approval.
