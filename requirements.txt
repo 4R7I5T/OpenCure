@@ -1,9 +1,0 @@
-pandas
-tiktoken
-openai
-bcftools
-bwa
-samtools
-htslib
-freebayes
-snpeff

@@ -64,7 +64,7 @@ NEUROLOGICAL_RARE_TARGETS = {
         "chrom": "chrX",
         "start": 154_021_573,
         "end": 154_097_717,
-        "strand": "+",
+        "strand": "-",
         "refseq": "NC_000023.11",
         "cytoband": "Xq28",
         "exon_count": 4,

@@ -76,27 +76,64 @@ def classify_hit(hit: dict) -> str:
 
 def heuristic_offtarget_check(sequence: str) -> dict:
     """
-    Simple heuristic when Cas-OFFinder is unavailable.
-    Flags obvious issues but is NOT a substitute for real off-target search.
-    """
-    from ..utils.sequence_utils import gc_content
+    Heuristic off-target risk assessment when Cas-OFFinder is unavailable.
 
-    gc = gc_content(sequence)
+    Evaluates the PAM-proximal seed region (positions 1-12 from PAM),
+    overall GC content, and sequence complexity.  The seed region is the
+    primary determinant of Cas9 binding specificity -- mismatches in the
+    seed are far less tolerated than in the PAM-distal region.
+
+    NOT a substitute for genome-wide off-target search, but catches the
+    highest-risk guides.
+    """
+    from ..utils.sequence_utils import gc_content, reverse_complement
+
+    seq = sequence.upper()
+    gc = gc_content(seq)
     risk = "LOW"
     notes = []
 
+    # ── 1. Overall GC content ──
     if gc > 0.75:
         risk = "MODERATE"
-        notes.append("High GC content increases off-target risk")
+        notes.append(f"High GC ({gc:.0%}) increases off-target binding stability")
     if gc < 0.30:
         risk = "MODERATE"
-        notes.append("Low GC content may reduce specificity")
+        notes.append(f"Low GC ({gc:.0%}) may reduce on-target specificity")
 
-    # Check for common repetitive seeds
-    seed = sequence[:12]
+    # ── 2. Seed region analysis (PAM-proximal 12nt = last 12 bases) ──
+    seed = seq[-12:]  # PAM-proximal seed
+    seed_gc = gc_content(seed)
+
+    # Low-complexity seed is the strongest off-target predictor
     if len(set(seed)) <= 2:
         risk = "HIGH"
-        notes.append("Low-complexity seed region")
+        notes.append("Low-complexity seed region (≤2 distinct bases in 12nt)")
+    elif len(set(seed)) == 3 and seed_gc > 0.80:
+        risk = "MODERATE"
+        notes.append("GC-biased seed with limited base diversity")
+
+    # Seed homopolymers increase off-target risk
+    for base in "ACGT":
+        if base * 4 in seed:
+            if risk != "HIGH":
+                risk = "MODERATE"
+            notes.append(f"Seed contains {base}×4 homopolymer")
+
+    # ── 3. Repetitive motifs (dinucleotide repeats) ──
+    for dinuc in ["AT", "TA", "GC", "CG", "GT", "TG", "AC", "CA"]:
+        if (dinuc * 4) in seq:  # 4x dinucleotide repeat (8bp)
+            if risk != "HIGH":
+                risk = "MODERATE"
+            notes.append(f"Contains {dinuc}×4 dinucleotide repeat")
+
+    # ── 4. Self-complementarity in seed (potential for off-target at
+    #        inverted repeat genomic sites) ──
+    seed_rc = reverse_complement(seed)
+    if seed_rc[:8] in seq:
+        if risk != "HIGH":
+            risk = "MODERATE"
+        notes.append("Seed region is partially self-complementary")
 
     return {"risk": risk, "notes": "; ".join(notes) if notes else "Pass"}
 

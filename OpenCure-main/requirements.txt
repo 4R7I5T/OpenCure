@@ -1,5 +1,0 @@
-pandas
-tiktoken
-openai
-biopython
-requests

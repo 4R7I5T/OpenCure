@@ -39,21 +39,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .config import (DIAGNOSIS_CANCER, DIAGNOSIS_MENTAL_HEALTH,
-                     DIAGNOSIS_NEUROPSYCH, DIAGNOSIS_AUTOIMMUNE,
-                     DIAGNOSIS_HEMATOLOGICAL, DIAGNOSIS_IMMUNODEFICIENCY,
-                     DIAGNOSIS_HEREDITARY, DIAGNOSIS_CARDIAC,
-                     DIAGNOSIS_RARE_DISEASE, DIAGNOSIS_INFECTIOUS,
-                     DIAGNOSIS_IMMUNE_DYSREGULATION, DIAGNOSIS_TELOMERE_AGING,
-                     DIAGNOSIS_PULMONARY, DIAGNOSIS_HEPATIC,
-                     DIAGNOSIS_SKELETAL, DIAGNOSIS_DERMATOLOGIC,
-                     DIAGNOSIS_MITOCHONDRIAL, DIAGNOSIS_COMPLEMENT,
-                     DIAGNOSIS_COAGULATION, DIAGNOSIS_PAIN,
-                     DIAGNOSIS_EPILEPSY, DIAGNOSIS_CONGENITAL_HEART,
-                     DIAGNOSIS_MONOGENIC_DIABETES, DIAGNOSIS_OBESITY,
-                     DIAGNOSIS_OPHTHALMOLOGY, DIAGNOSIS_NCL,
-                     DIAGNOSIS_BONE_MARROW_FAILURE, DIAGNOSIS_IMMUNE_CHECKPOINT,
-                     DIAGNOSIS_CRANIOFACIAL, VALID_DIAGNOSES)
+from .config import (DIAGNOSIS_CANCER, DIAGNOSIS_NEUROPSYCH,
+                     DIAGNOSIS_AUTOIMMUNE, DIAGNOSIS_RARE_DISEASE,
+                     VALID_DIAGNOSES)
 from .databases.cancer_genes import CANCER_TARGETS
 from .databases.therapeutic_targets import MENTAL_HEALTH_TARGETS
 from .databases.neuropsych_targets import (NEUROPSYCH_TARGETS,
@@ -99,6 +87,37 @@ from .databases.expanded_disease_targets import (
 from .databases.inborn_errors_and_rare_targets import (
     ALL_INBORN_ERRORS_TARGETS,
 )
+from .databases.neurodegenerative_targets import ALL_NEURODEGENERATIVE_TARGETS
+from .databases.renal_targets import ALL_RENAL_TARGETS
+from .databases.metabolic_liver_targets import ALL_METABOLIC_LIVER_TARGETS
+from .databases.hearing_loss_targets import HEARING_LOSS_TARGETS
+from .databases.lipid_targets import LIPID_TARGETS
+from .databases.neuromuscular_targets import NEUROMUSCULAR_TARGETS
+from .databases.connective_tissue_targets import CONNECTIVE_TISSUE_TARGETS
+from .databases.endocrine_targets import ENDOCRINE_TARGETS
+from .databases.vascular_targets import VASCULAR_TARGETS
+from .databases.lymphatic_targets import LYMPHATIC_TARGETS
+from .databases.fertility_targets import FERTILITY_TARGETS
+from .databases.leukodystrophy_targets import LEUKODYSTROPHY_TARGETS
+from .databases.neurodevelopmental_targets import NEURODEVELOPMENTAL_TARGETS
+from .databases.peripheral_neuropathy_targets import PERIPHERAL_NEUROPATHY_TARGETS
+from .databases.movement_disorder_targets import MOVEMENT_DISORDER_TARGETS
+from .databases.porphyria_targets import PORPHYRIA_TARGETS
+from .databases.ciliopathy_targets import CILIOPATHY_TARGETS
+from .databases.skeletal_channelopathy_targets import SKELETAL_CHANNELOPATHY_TARGETS
+from .databases.platelet_targets import PLATELET_TARGETS
+from .databases.prion_sleep_targets import PRION_SLEEP_TARGETS
+from .databases.dental_targets import DENTAL_TARGETS
+from .databases.spinocerebellar_ataxia_targets import SPINOCEREBELLAR_ATAXIA_TARGETS
+from .databases.spastic_paraplegia_targets import SPASTIC_PARAPLEGIA_TARGETS
+from .databases.glycosylation_targets import GLYCOSYLATION_TARGETS
+from .databases.peroxisomal_targets import PEROXISOMAL_TARGETS
+from .databases.organic_acidemia_targets import ORGANIC_ACIDEMIA_TARGETS
+from .databases.congenital_myopathy_targets import CONGENITAL_MYOPATHY_TARGETS
+from .databases.mucopolysaccharidosis_targets import MUCOPOLYSACCHARIDOSIS_TARGETS
+from .databases.dna_repair_targets import DNA_REPAIR_TARGETS
+from .databases.bone_dysplasia_targets import BONE_DYSPLASIA_TARGETS
+from .databases.enteric_neural_crest_targets import ENTERIC_NEURAL_CREST_TARGETS
 
 from .steps import (
     step1_validate,
@@ -114,139 +133,105 @@ from .steps import (
 log = logging.getLogger("opencure")
 
 
+def _filter_by_conditions(targets: dict, conditions: list[str] | None) -> dict:
+    """Filter targets by condition; returns all targets if no match."""
+    if not conditions:
+        return targets
+    filtered = {
+        gene: info for gene, info in targets.items()
+        if any(c in info.get("conditions", []) for c in conditions)
+    }
+    return filtered if filtered else targets
+
+
+# Dispatch table: diagnosis → target dict(s)
+_TARGETS_MAP: dict[str, dict] = {
+    "cancer":                CANCER_TARGETS,
+    "mental_health":         MENTAL_HEALTH_TARGETS,
+    "neuropsychiatric":      NEUROPSYCH_TARGETS,
+    "autoimmune":            AUTOIMMUNE_TARGETS,
+    "hematological":         ALL_HEMATOLOGICAL_TARGETS,
+    "immunodeficiency":      ALL_GENE_THERAPY_TARGETS,
+    "hereditary":            ALL_HEREDITARY_TARGETS,
+    "cardiac":               ALL_CARDIAC_TARGETS,
+    "rare_disease":          ALL_RARE_DISEASE_TARGETS,
+    "infectious":            INFECTIOUS_DISEASE_TARGETS,
+    "immune_dysregulation":  IMMUNE_DYSREGULATION_TARGETS,
+    "telomere_aging":        TELOMERE_AGING_TARGETS,
+    "pulmonary":             PULMONARY_TARGETS,
+    "hepatic":               HEPATIC_TARGETS,
+    "skeletal":              SKELETAL_TARGETS,
+    "dermatologic":          DERMATOLOGIC_TARGETS,
+    "mitochondrial":         MITOCHONDRIAL_TARGETS,
+    "complement":            COMPLEMENT_TARGETS,
+    "coagulation":           COAGULATION_TARGETS,
+    "pain":                  PAIN_TARGETS,
+    "epilepsy":              EPILEPSY_TARGETS,
+    "congenital_heart":      CONGENITAL_HEART_TARGETS,
+    "monogenic_diabetes":    MONOGENIC_DIABETES_TARGETS,
+    "obesity":               OBESITY_TARGETS,
+    "ophthalmology":         OPHTHALMOLOGY_TARGETS,
+    "ncl":                   NCL_TARGETS,
+    "bone_marrow_failure":   BONE_MARROW_FAILURE_TARGETS,
+    "immune_checkpoint":     IMMUNE_CHECKPOINT_TARGETS,
+    "craniofacial":          CRANIOFACIAL_TARGETS,
+    "neurodegenerative":     ALL_NEURODEGENERATIVE_TARGETS,
+    "renal":                 ALL_RENAL_TARGETS,
+    "metabolic_liver":       ALL_METABOLIC_LIVER_TARGETS,
+    "hearing_loss":          HEARING_LOSS_TARGETS,
+    "lipid":                 LIPID_TARGETS,
+    "neuromuscular":         NEUROMUSCULAR_TARGETS,
+    "connective_tissue":     CONNECTIVE_TISSUE_TARGETS,
+    "endocrine":             ENDOCRINE_TARGETS,
+    "vascular":              VASCULAR_TARGETS,
+    "lymphatic":             LYMPHATIC_TARGETS,
+    "fertility":             FERTILITY_TARGETS,
+    "leukodystrophy":        LEUKODYSTROPHY_TARGETS,
+    "neurodevelopmental":    NEURODEVELOPMENTAL_TARGETS,
+    "peripheral_neuropathy": PERIPHERAL_NEUROPATHY_TARGETS,
+    "movement_disorder":     MOVEMENT_DISORDER_TARGETS,
+    "porphyria":             PORPHYRIA_TARGETS,
+    "ciliopathy":            CILIOPATHY_TARGETS,
+    "skeletal_channelopathy": SKELETAL_CHANNELOPATHY_TARGETS,
+    "platelet":              PLATELET_TARGETS,
+    "prion_sleep":           PRION_SLEEP_TARGETS,
+    "dental":                DENTAL_TARGETS,
+    "spinocerebellar_ataxia": SPINOCEREBELLAR_ATAXIA_TARGETS,
+    "spastic_paraplegia":    SPASTIC_PARAPLEGIA_TARGETS,
+    "glycosylation":         GLYCOSYLATION_TARGETS,
+    "peroxisomal":           PEROXISOMAL_TARGETS,
+    "organic_acidemia":      ORGANIC_ACIDEMIA_TARGETS,
+    "congenital_myopathy":   CONGENITAL_MYOPATHY_TARGETS,
+    "mucopolysaccharidosis": MUCOPOLYSACCHARIDOSIS_TARGETS,
+    "dna_repair":            DNA_REPAIR_TARGETS,
+    "bone_dysplasia":        BONE_DYSPLASIA_TARGETS,
+    "enteric_neural_crest":  ENTERIC_NEURAL_CREST_TARGETS,
+}
+
+
 def select_targets(diagnosis: str, conditions: list[str] | None = None) -> dict:
     """
     Return the gene-target dict appropriate for the diagnosis.
-    Optionally filter mental-health / neuropsych targets by condition.
+    Optionally filter targets by condition.
     """
-    if diagnosis == DIAGNOSIS_CANCER:
-        return dict(CANCER_TARGETS)
+    if diagnosis not in _TARGETS_MAP:
+        raise ValueError(f"Unknown diagnosis: {diagnosis}")
 
-    if diagnosis == DIAGNOSIS_MENTAL_HEALTH:
-        targets = dict(MENTAL_HEALTH_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
+    targets = dict(_TARGETS_MAP[diagnosis])
 
-    if diagnosis == DIAGNOSIS_NEUROPSYCH:
-        targets = dict(NEUROPSYCH_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
-
-    if diagnosis == DIAGNOSIS_AUTOIMMUNE:
-        targets = dict(AUTOIMMUNE_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
-
-    if diagnosis == DIAGNOSIS_HEMATOLOGICAL:
-        targets = dict(ALL_HEMATOLOGICAL_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
-
-    if diagnosis == DIAGNOSIS_IMMUNODEFICIENCY:
-        targets = dict(ALL_GENE_THERAPY_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
-
-    if diagnosis == DIAGNOSIS_HEREDITARY:
-        targets = dict(ALL_HEREDITARY_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
-
-    if diagnosis == DIAGNOSIS_CARDIAC:
-        targets = dict(ALL_CARDIAC_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
-
+    # Rare disease aggregates multiple target databases
     if diagnosis == DIAGNOSIS_RARE_DISEASE:
-        targets = dict(ALL_RARE_DISEASE_TARGETS)
         targets.update(ALL_ADDITIONAL_RARE_TARGETS)
         targets.update(ALL_INBORN_ERRORS_TARGETS)
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
 
-    # Map remaining diagnosis categories to their target dicts
-    _CATEGORY_MAP = {
-        DIAGNOSIS_INFECTIOUS: INFECTIOUS_DISEASE_TARGETS,
-        DIAGNOSIS_IMMUNE_DYSREGULATION: IMMUNE_DYSREGULATION_TARGETS,
-        DIAGNOSIS_TELOMERE_AGING: TELOMERE_AGING_TARGETS,
-        DIAGNOSIS_PULMONARY: PULMONARY_TARGETS,
-        DIAGNOSIS_HEPATIC: HEPATIC_TARGETS,
-        DIAGNOSIS_SKELETAL: SKELETAL_TARGETS,
-        DIAGNOSIS_DERMATOLOGIC: DERMATOLOGIC_TARGETS,
-        DIAGNOSIS_MITOCHONDRIAL: MITOCHONDRIAL_TARGETS,
-        DIAGNOSIS_COMPLEMENT: COMPLEMENT_TARGETS,
-        DIAGNOSIS_COAGULATION: COAGULATION_TARGETS,
-        DIAGNOSIS_PAIN: PAIN_TARGETS,
-        DIAGNOSIS_EPILEPSY: EPILEPSY_TARGETS,
-        DIAGNOSIS_CONGENITAL_HEART: CONGENITAL_HEART_TARGETS,
-        DIAGNOSIS_MONOGENIC_DIABETES: MONOGENIC_DIABETES_TARGETS,
-        DIAGNOSIS_OBESITY: OBESITY_TARGETS,
-        DIAGNOSIS_OPHTHALMOLOGY: OPHTHALMOLOGY_TARGETS,
-        DIAGNOSIS_NCL: NCL_TARGETS,
-        DIAGNOSIS_BONE_MARROW_FAILURE: BONE_MARROW_FAILURE_TARGETS,
-        DIAGNOSIS_IMMUNE_CHECKPOINT: IMMUNE_CHECKPOINT_TARGETS,
-        DIAGNOSIS_CRANIOFACIAL: CRANIOFACIAL_TARGETS,
+    # Exclude entries without valid human genomic coordinates (e.g. viral
+    # targets like HBV_cccDNA / HPV_E6E7 that need a separate workflow).
+    targets = {
+        gene: info for gene, info in targets.items()
+        if isinstance(info.get("start"), int) and isinstance(info.get("end"), int)
     }
-    if diagnosis in _CATEGORY_MAP:
-        targets = dict(_CATEGORY_MAP[diagnosis])
-        if conditions:
-            filtered = {}
-            for gene, info in targets.items():
-                gene_conditions = info.get("conditions", [])
-                if any(c in gene_conditions for c in conditions):
-                    filtered[gene] = info
-            return filtered if filtered else targets
-        return targets
 
-    raise ValueError(f"Unknown diagnosis: {diagnosis}")
+    return _filter_by_conditions(targets, conditions)
 
 
 def run(vcf_path: str, bam_path: str, bai_path: str | None,

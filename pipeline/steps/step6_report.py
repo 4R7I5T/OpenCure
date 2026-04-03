@@ -44,7 +44,7 @@ def run(patient_id: str, diagnosis: str, output_dir: Path,
     summary = {
         "patient_id": patient_id,
         "diagnosis_type": diagnosis,
-        "pipeline_version": "2.1.0",
+        "pipeline_version": "3.0.0",
         "timestamp": timestamp,
         "validation": {
             "vcf_valid": validation.get("vcf", {}).get("valid", False),
@@ -147,7 +147,7 @@ def run(patient_id: str, diagnosis: str, output_dir: Path,
         f.write(f"  Patient:    {patient_id}\n")
         f.write(f"  Diagnosis:  {diagnosis}\n")
         f.write(f"  Date:       {timestamp}\n")
-        f.write(f"  Pipeline:   v2.1.0\n")
+        f.write(f"  Pipeline:   v3.0.0\n")
         f.write("=" * 64 + "\n\n")
 
         f.write("INPUT VALIDATION\n")

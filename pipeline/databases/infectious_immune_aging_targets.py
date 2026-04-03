@@ -40,7 +40,7 @@ INFECTIOUS_DISEASE_TARGETS = {
     "CCR5": {
         "gene_id": 1234,
         "chrom": "chr3",
-        "start": 46_370_854,
+        "start": 46_370_142,
         "end": 46_376_206,
         "strand": "+",
         "refseq": "NC_000003.12",
@@ -138,7 +138,7 @@ INFECTIOUS_DISEASE_TARGETS = {
         "chrom": "chr2",
         "start": 136_114_349,
         "end": 136_118_149,
-        "strand": "+",
+        "strand": "-",
         "refseq": "NC_000002.12",
         "cytoband": "2q22.1",
         "exon_count": 2,
@@ -386,7 +386,7 @@ IMMUNE_DYSREGULATION_TARGETS = {
         "gene_id": 50943,
         "chrom": "chrX",
         "start": 49_250_436,
-        "end": 49_266_787,
+        "end": 49_264_710,
         "strand": "-",
         "refseq": "NC_000023.11",
         "cytoband": "Xp11.23",
@@ -471,9 +471,9 @@ IMMUNE_DYSREGULATION_TARGETS = {
     "PRF1": {
         "gene_id": 5551,
         "chrom": "chr10",
-        "start": 72_027_418,
-        "end": 72_032_787,
-        "strand": "+",
+        "start": 70_597_348,
+        "end": 70_602_741,
+        "strand": "-",
         "refseq": "NC_000010.11",
         "cytoband": "10q22.1",
         "exon_count": 3,
@@ -1433,9 +1433,9 @@ TELOMERE_AGING_TARGETS = {
     "LMNA": {
         "gene_id": 4000,
         "chrom": "chr1",
-        "start": 156_104_878,
-        "end": 156_134_876,
-        "strand": "-",
+        "start": 156_082_573,
+        "end": 156_140_081,
+        "strand": "+",
         "refseq": "NC_000001.11",
         "cytoband": "1q22",
         "exon_count": 12,
@@ -2391,12 +2391,12 @@ DERMATOLOGIC_TARGETS = {
 
 GENE_COORDINATES_GRCH38 = {
     # Infectious Disease
-    "CCR5":      {"chrom": "chr3",  "start": 46_370_854,  "end": 46_376_206},
+    "CCR5":      {"chrom": "chr3",  "start": 46_370_142,  "end": 46_376_206},
     "CXCR4":     {"chrom": "chr2",  "start": 136_114_349, "end": 136_118_149},
     # HBV/HPV are viral -- no human coordinates
     # Immune Dysregulation
-    "FOXP3":     {"chrom": "chrX",  "start": 49_250_436,  "end": 49_266_787},
-    "PRF1":      {"chrom": "chr10", "start": 72_027_418,  "end": 72_032_787},
+    "FOXP3":     {"chrom": "chrX",  "start": 49_250_436,  "end": 49_264_710},
+    "PRF1":      {"chrom": "chr10", "start": 70_597_348,  "end": 70_602_741},
     "UNC13D":    {"chrom": "chr17", "start": 75_788_918,  "end": 75_825_099},
     "STX11":     {"chrom": "chr6",  "start": 132_109_537, "end": 132_112_190},
     "STXBP2":    {"chrom": "chr19", "start": 7_573_534,   "end": 7_592_730},
@@ -2411,7 +2411,7 @@ GENE_COORDINATES_GRCH38 = {
     "TERC":      {"chrom": "chr3",  "start": 169_764_516, "end": 169_765_067},
     "DKC1":      {"chrom": "chrX",  "start": 154_762_741, "end": 154_777_618},
     "WRN":       {"chrom": "chr8",  "start": 30_887_318,  "end": 31_028_637},
-    "LMNA":      {"chrom": "chr1",  "start": 156_104_878, "end": 156_134_876},
+    "LMNA":      {"chrom": "chr1",  "start": 156_082_573, "end": 156_140_081},
     # Pulmonary
     "BMPR2":     {"chrom": "chr2",  "start": 202_371_949, "end": 202_561_032},
     "SFTPB":     {"chrom": "chr2",  "start": 85_657_214,  "end": 85_668_493},

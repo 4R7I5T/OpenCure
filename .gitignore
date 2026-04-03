@@ -38,5 +38,8 @@ OpenCure_Website/*.zip
 # Archives
 *.zip
 
+# Generated training data
+*.jsonl
+
 # Claude local state
 .claude/ralph-loop.local.md

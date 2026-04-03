@@ -17,13 +17,39 @@ log = logging.getLogger(__name__)
 PROMOTER_UPSTREAM = 2000  # bp upstream of gene start
 
 
+def _passes_30x_quality(v, min_dp: int, min_ad: int,
+                        min_qual: float, min_gq: int) -> bool:
+    """
+    Check if a variant passes quality thresholds appropriate for 30x WGS.
+
+    At 30x mean coverage, heterozygous variants require sufficient depth
+    and alt-allele support to distinguish from sequencing errors.
+    """
+    if v.qual < min_qual:
+        return False
+    # If depth fields are populated (non-zero), apply filters
+    if v.depth > 0 and v.depth < min_dp:
+        return False
+    if v.alt_depth > 0 and v.alt_depth < min_ad:
+        return False
+    if v.genotype_qual > 0 and v.genotype_qual < min_gq:
+        return False
+    return True
+
+
 def extract_profile(vcf_path: str, targets: dict) -> dict:
     """
     Build a patient variant profile for every target gene.
     Uses multi-region extraction to avoid scanning the VCF multiple times.
 
+    Applies 30x WGS quality filters to ensure variant calls used for
+    guide design are reliable at typical clinical WGS depths.
+
     Returns {gene_name: {coding_variants, promoter_variants, ...}}.
     """
+    from ..config import (MIN_VARIANT_DEPTH, MIN_VARIANT_ALT_DEPTH,
+                          MIN_VARIANT_QUAL, MIN_GENOTYPE_QUAL)
+
     # Build all regions to query in one batch
     regions = {}
     for gene, coords in targets.items():
@@ -40,8 +66,23 @@ def extract_profile(vcf_path: str, targets: dict) -> dict:
 
     profile: dict = {}
     for gene, coords in targets.items():
-        coding = all_variants.get(f"{gene}_coding", [])
-        promoter = all_variants.get(f"{gene}_promoter", [])
+        raw_coding = all_variants.get(f"{gene}_coding", [])
+        raw_promoter = all_variants.get(f"{gene}_promoter", [])
+
+        # Apply 30x quality filters
+        coding = [v for v in raw_coding
+                  if _passes_30x_quality(v, MIN_VARIANT_DEPTH,
+                                         MIN_VARIANT_ALT_DEPTH,
+                                         MIN_VARIANT_QUAL,
+                                         MIN_GENOTYPE_QUAL)]
+        promoter = [v for v in raw_promoter
+                    if _passes_30x_quality(v, MIN_VARIANT_DEPTH,
+                                           MIN_VARIANT_ALT_DEPTH,
+                                           MIN_VARIANT_QUAL,
+                                           MIN_GENOTYPE_QUAL)]
+
+        filtered_coding = len(raw_coding) - len(coding)
+        filtered_promoter = len(raw_promoter) - len(promoter)
 
         profile[gene] = {
             "chrom": coords["chrom"],
@@ -52,6 +93,8 @@ def extract_profile(vcf_path: str, targets: dict) -> dict:
             "promoter_variants": [_variant_to_dict(v) for v in promoter],
             "total_coding": len(coding),
             "total_promoter": len(promoter),
+            "filtered_low_quality_coding": filtered_coding,
+            "filtered_low_quality_promoter": filtered_promoter,
         }
 
     return profile
@@ -66,6 +109,9 @@ def _variant_to_dict(v) -> dict:
         "zygosity": v.zygosity,
         "type": v.var_type,
         "filter": v.filter_status,
+        "depth": v.depth,
+        "alt_depth": v.alt_depth,
+        "genotype_qual": v.genotype_qual,
     }
 
 

@@ -196,8 +196,8 @@ CANCER_TARGETS = {
     },
     "MSH6": {
         "chrom": "chr2",
-        "start": 47695530,
-        "end": 47721031,
+        "start": 47783145,
+        "end": 47810101,
         "role": "MutS homolog 6 — DNA mismatch repair (MSH2-MSH6 heterodimer)",
         "strategy": "HDR correction of truncating mutations",
         "common_cancers": ["colorectal", "endometrial"],

@@ -21,6 +21,9 @@ class Variant:
     genotype: list[int] | None = None
     var_type: str = "snp"
     zygosity: str = "UNKNOWN"
+    depth: int = 0           # total read depth (DP) at this site
+    alt_depth: int = 0       # alternate allele read depth (AD[1])
+    genotype_qual: int = 0   # genotype quality (GQ)
 
     @property
     def is_pass(self) -> bool:
@@ -74,15 +77,22 @@ def parse_vcf(vcf_path: str, region: tuple[str, int, int] | None = None):
             if isinstance(var_type, str) and "," in var_type:
                 var_type = var_type.split(",")[0]
 
-            # Parse genotype if FORMAT/sample columns exist
+            # Parse genotype and quality fields from FORMAT/sample columns
             genotype = None
             zygosity = "UNKNOWN"
+            depth = 0
+            alt_depth = 0
+            genotype_qual = 0
             if len(fields) >= 10:
                 fmt = fields[8].split(":")
                 sample = fields[9].split(":")
-                if "GT" in fmt:
-                    gt_idx = fmt.index("GT")
-                    gt_str = sample[gt_idx]
+                fmt_map = {}
+                for fi, fv in zip(fmt, sample):
+                    fmt_map[fi] = fv
+
+                # Genotype (GT)
+                if "GT" in fmt_map:
+                    gt_str = fmt_map["GT"]
                     sep = "/" if "/" in gt_str else "|"
                     alleles = gt_str.split(sep)
                     try:
@@ -92,6 +102,29 @@ def parse_vcf(vcf_path: str, region: tuple[str, int, int] | None = None):
                         else:
                             zygosity = "HET"
                     except (ValueError, IndexError):
+                        pass
+
+                # Read depth (DP)
+                if "DP" in fmt_map:
+                    try:
+                        depth = int(fmt_map["DP"])
+                    except (ValueError, TypeError):
+                        pass
+
+                # Allele depths (AD) -- format: ref_depth,alt_depth[,alt2_depth]
+                if "AD" in fmt_map:
+                    try:
+                        ad_parts = fmt_map["AD"].split(",")
+                        if len(ad_parts) >= 2:
+                            alt_depth = int(ad_parts[1])
+                    except (ValueError, TypeError):
+                        pass
+
+                # Genotype quality (GQ)
+                if "GQ" in fmt_map:
+                    try:
+                        genotype_qual = int(fmt_map["GQ"])
+                    except (ValueError, TypeError):
                         pass
 
             yield Variant(
@@ -105,6 +138,9 @@ def parse_vcf(vcf_path: str, region: tuple[str, int, int] | None = None):
                 genotype=genotype,
                 var_type=var_type,
                 zygosity=zygosity,
+                depth=depth,
+                alt_depth=alt_depth,
+                genotype_qual=genotype_qual,
             )
 
 

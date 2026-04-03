@@ -67,43 +67,102 @@ REPORTER_SIZES = {
 }
 
 
+def _infer_strategy(target_info: dict) -> str:
+    """
+    Infer therapeutic strategy from all available database fields.
+
+    Checks (in order): explicit ``strategy`` / ``crispr_strategy``,
+    approach text from ``key_variants`` and ``clinical_trials``,
+    and ``inheritance`` pattern to determine the correct CRISPR modality.
+    """
+    strategy = target_info.get("strategy", "") or target_info.get("crispr_strategy", "")
+    if strategy:
+        return strategy
+
+    # Collect approach descriptions from key_variants and clinical_trials
+    approaches = []
+    for var in target_info.get("key_variants", []):
+        a = var.get("approach", "")
+        if a:
+            approaches.append(a if isinstance(a, str) else " ".join(a))
+    for trial in target_info.get("clinical_trials", []):
+        a = trial.get("approach", "")
+        if a:
+            approaches.append(a if isinstance(a, str) else " ".join(a))
+
+    for approach in approaches:
+        approach_lower = approach.lower()
+        if "base edit" in approach_lower or "base-edit" in approach_lower or "prime edit" in approach_lower:
+            return "base-editing correction"
+        if "knockout" in approach_lower or "disrupt" in approach_lower or "ablat" in approach_lower:
+            return "knockout"
+        if "gene addition" in approach_lower or "gene replacement" in approach_lower:
+            return "HDR gene correction"
+        if "crispri" in approach_lower or "silenc" in approach_lower:
+            return "CRISPRi"
+        if "crispra" in approach_lower or "activat" in approach_lower:
+            return "CRISPRa"
+
+    # Infer from inheritance pattern
+    inheritance = target_info.get("inheritance", "").lower()
+    if "gain-of-function" in inheritance or "gain of function" in inheritance:
+        return "CRISPRi silencing of gain-of-function allele"
+    if "dominant-negative" in inheritance or "dominant negative" in inheritance:
+        return "knockout of dominant-negative allele"
+    if "haploinsufficiency" in inheritance:
+        return "CRISPRa to enhance expression from remaining allele"
+    # AR, XLR = loss-of-function → correction
+    if inheritance.startswith("ar") or "xlr" in inheritance or "xld" in inheritance:
+        return "HDR correction of pathogenic variant"
+
+    return ""
+
+
 def _determine_construct_type(gene: str, target_info: dict) -> dict:
     """
     Decide the construct type based on the gene's therapeutic strategy.
-    """
-    strategy = target_info.get("strategy", "")
-    role = target_info.get("role", "")
 
-    # Cancer: oncogene → silence; tumor suppressor → reactivate
-    if "CRISPRi" in strategy or "silenc" in strategy.lower():
+    First checks the explicit ``strategy`` field, then infers from
+    ``key_variants[].approach`` and ``inheritance`` if strategy is absent.
+    """
+    strategy = _infer_strategy(target_info)
+    role = target_info.get("role", "")
+    neuronal = "neuro" in role.lower()
+
+    strategy_lower = strategy.lower()
+
+    # Check explicit modality keywords before fuzzy text matches to avoid
+    # e.g. "CRISPRa to reactivate silenced allele" matching CRISPRi on "silenc".
+    if "CRISPRi" in strategy or ("silenc" in strategy_lower and "CRISPRa" not in strategy):
         return {
             "type": "CRISPRi",
             "effector": "dCas9-KRAB",
-            "promoter": "CamKII" if "neuro" in role.lower() else "CMV",
+            "promoter": "CamKII" if neuronal else "CMV",
             "purpose": f"Transcriptional silencing of {gene}",
         }
-    elif "CRISPRa" in strategy or "reactivat" in strategy.lower() or "enhance" in strategy.lower():
+    elif "CRISPRa" in strategy or "reactivat" in strategy_lower or "enhance" in strategy_lower:
         return {
             "type": "CRISPRa",
             "effector": "dCas9-VPR",
-            "promoter": "CamKII" if "neuro" in role.lower() else "CMV",
+            "promoter": "CamKII" if neuronal else "CMV",
             "purpose": f"Transcriptional activation of {gene}",
         }
-    elif "HDR" in strategy or "correction" in strategy.lower() or "correct" in strategy.lower():
-        return {
-            "type": "HDR_correction",
-            "effector": "SpCas9",
-            "promoter": "CMV",
-            "purpose": f"Precise mutation correction in {gene} via HDR",
-        }
-    elif "base-edit" in strategy.lower() or "base edit" in strategy.lower():
+    # Check base editing BEFORE HDR — both may contain "correction"
+    elif "base-edit" in strategy_lower or "base edit" in strategy_lower or "prime edit" in strategy_lower:
         return {
             "type": "base_editing",
             "effector": "ABE8e",
             "promoter": "CMV",
             "purpose": f"Base editing of pathogenic variants in {gene}",
         }
-    elif "knockout" in strategy.lower() or "disrupt" in strategy.lower():
+    elif "HDR" in strategy or "correction" in strategy_lower or "correct" in strategy_lower:
+        return {
+            "type": "HDR_correction",
+            "effector": "SpCas9",
+            "promoter": "CMV",
+            "purpose": f"Precise mutation correction in {gene} via HDR",
+        }
+    elif "knockout" in strategy_lower or "disrupt" in strategy_lower:
         return {
             "type": "knockout",
             "effector": "SpCas9",
@@ -111,11 +170,13 @@ def _determine_construct_type(gene: str, target_info: dict) -> dict:
             "purpose": f"Gene disruption of {gene}",
         }
     else:
+        # Default: HDR correction is safer than CRISPRi for unknown genes —
+        # most rare-disease targets are loss-of-function.
         return {
-            "type": "CRISPRi",
-            "effector": "dCas9-KRAB",
+            "type": "HDR_correction",
+            "effector": "SpCas9",
             "promoter": "CMV",
-            "purpose": f"Modulation of {gene}",
+            "purpose": f"Targeted correction of {gene}",
         }
 
 

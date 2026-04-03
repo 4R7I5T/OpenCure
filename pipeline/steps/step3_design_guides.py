@@ -48,8 +48,8 @@ def _fetch_reference_sequence(chrom: str, start: int, end: int,
                 except (KeyError, ValueError):
                     continue
             fa.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("Failed to read reference FASTA %s: %s", ref_path, exc)
 
     # 2. BAM consensus — reconstruct from aligned reads
     if bam_path and os.path.isfile(bam_path):
@@ -140,7 +140,7 @@ def _consensus_from_bam(bam_path: str, bai_path: str | None,
                     continue
 
                 counts = bam.count_coverage(c, start, end,
-                                            quality_threshold=0)
+                                            quality_threshold=20)
                 bases = "ACGT"
                 seq = []
                 for i in range(len(counts[0])):
@@ -211,29 +211,43 @@ def design_for_gene(gene: str, coords: dict, profile_entry: dict,
             var_type=vd["type"], zygosity=vd["zygosity"],
         ))
 
-    patient_seq = apply_variants_to_sequence(ref_seq, variants, target_start)
+    # Build both allele sequences for allele-specific guide design
+    # Alt-all: applies both HOM_ALT and HET variants (targets mutant allele)
+    patient_seq_alt = apply_variants_to_sequence(
+        ref_seq, variants, target_start, allele="alt_all")
+    # Ref: unmodified reference (targets wild-type allele)
+    patient_seq_ref = apply_variants_to_sequence(
+        ref_seq, variants, target_start, allele="ref")
 
-    # Find PAM sites on patient sequence
-    raw_guides = find_pam_sites(patient_seq, guide_length=GUIDE_LENGTH,
+    # Design guides on mutant allele sequence (primary)
+    raw_guides = find_pam_sites(patient_seq_alt, guide_length=GUIDE_LENGTH,
                                 region_start=target_start)
 
-    # Score and rank
+    # Also find reference-allele guides for comparison
+    ref_guides = find_pam_sites(patient_seq_ref, guide_length=GUIDE_LENGTH,
+                                region_start=target_start)
+    ref_guide_seqs = {g.sequence for g in ref_guides}
+
+    # Score and rank (applies Synthego manufacturing filters)
     scored = score_guides(raw_guides)
     top = scored[:TOP_GUIDES_PER_TARGET]
 
-    # Annotate guides that span patient variants
+    # Annotate guides
     for guide in top:
         guide.gene = gene
         guide.target_name = f"{gene}_promoter"
+        # Check if guide spans a patient variant (allele-specific)
         for vd in variants:
             rel = vd.pos - target_start
             if guide.position <= rel <= guide.position + GUIDE_LENGTH:
                 guide.spans_variant = True
                 guide.variant_note = (
                     f"Spans patient variant at {vd.pos} "
-                    f"({vd.ref}>{vd.alt}). Guide designed against "
-                    f"patient allele."
+                    f"({vd.ref}>{vd.alt}, {vd.zygosity}). Guide designed "
+                    f"against patient allele — allele-specific."
                 )
+
+    synthego_ok = sum(1 for g in top if g.synthego_compatible)
 
     return {
         "gene": gene,
@@ -241,6 +255,7 @@ def design_for_gene(gene: str, coords: dict, profile_entry: dict,
         "purpose": coords.get("strategy", coords.get("role", "")),
         "patient_variants_in_region": len(variants),
         "total_pam_sites": len(raw_guides),
+        "synthego_compatible_count": synthego_ok,
         "top_guides": [_guide_to_dict(g) for g in top],
     }
 
@@ -248,13 +263,17 @@ def design_for_gene(gene: str, coords: dict, profile_entry: dict,
 def _guide_to_dict(g: GuideRNA) -> dict:
     return {
         "sequence": g.sequence,
+        "synthego_order_seq": g.synthego_order_sequence,
         "pam": g.pam,
         "strand": g.strand,
         "position": g.position,
         "genomic_start": g.genomic_start,
         "gc_content": round(g.gc, 3),
+        "seed_gc_content": round(g.seed_gc, 3),
         "score": round(g.score, 1),
         "full_target": g.full_target,
+        "synthego_compatible": g.synthego_compatible,
+        "synthego_rejection_reason": g.synthego_rejection_reason,
         "spans_variant": g.spans_variant,
         "variant_note": g.variant_note,
         "offtarget_status": g.offtarget_status,

@@ -37,12 +37,10 @@ log = logging.getLogger(__name__)
 # Variant matching
 # ---------------------------------------------------------------------------
 
-def match_known_variants(patient_variants: dict,
-                         profile: dict) -> list[dict]:
+def match_known_variants(profile: dict) -> list[dict]:
     """
     Match patient variants against the known autoinflammatory variant catalog.
 
-    *patient_variants*: per-gene variant data from step 2 profile
     *profile*: full gene profile from step 2
 
     Returns a list of matched variant dicts.
@@ -416,7 +414,7 @@ def run(vcf_path: str, targets: dict, profile: dict,
     log.info("[Step 2c] Autoinflammatory variant annotation & Yao assessment")
 
     # 1. Match patient variants against known catalog
-    matches = match_known_variants(targets, profile)
+    matches = match_known_variants(profile)
     log.info("  Matched %d patient variant(s) against known catalog",
              len(matches))
     for m in matches:

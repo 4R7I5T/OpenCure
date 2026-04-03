@@ -1,1 +1,0 @@
-augustus --species=human sequences.fasta > predictions.gff3

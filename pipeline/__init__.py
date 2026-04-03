@@ -6,4 +6,4 @@ pharmacogenomic mental health therapeutics (treatment-response prediction
 and gene therapy for consented patients).
 """
 
-__version__ = "2.1.0"
+__version__ = "3.0.0"

@@ -150,7 +150,10 @@ def run(vcf_path: str, bam_path: str, bai_path: str | None,
     if not bam_result["valid"]:
         errors.append(f"BAM: {bam_result['error']}")
 
+    from ..config import LOW_COVERAGE_WARN_THRESHOLD
+
     coverage = {}
+    low_coverage_genes = []
     if bam_result["valid"]:
         for gene, coords in targets.items():
             cov = check_coverage(
@@ -158,11 +161,27 @@ def run(vcf_path: str, bam_path: str, bai_path: str | None,
                 gene=gene,
             )
             coverage[gene] = cov
+            # Flag genes with coverage below 30x-safe threshold
+            mean_cov = cov.get("mean_coverage")
+            if mean_cov is not None and mean_cov < LOW_COVERAGE_WARN_THRESHOLD:
+                low_coverage_genes.append(gene)
+                cov["low_coverage_warning"] = (
+                    f"Mean coverage {mean_cov:.1f}x is below {LOW_COVERAGE_WARN_THRESHOLD}x "
+                    f"threshold for reliable variant calling at 30x WGS. "
+                    f"Heterozygous variants in this region may be missed or "
+                    f"unreliable. Guide designs should be verified."
+                )
+
+    if low_coverage_genes:
+        log.warning("  %d target gene(s) have coverage below %dx: %s",
+                    len(low_coverage_genes), LOW_COVERAGE_WARN_THRESHOLD,
+                    ", ".join(low_coverage_genes[:10]))
 
     return {
         "vcf": vcf_result,
         "bam": bam_result,
         "coverage": coverage,
+        "low_coverage_genes": low_coverage_genes,
         "errors": errors,
         "passed": len(errors) == 0,
     }
